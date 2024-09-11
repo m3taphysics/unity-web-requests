@@ -322,11 +322,20 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 913c7a0730339c445abd4027432b921b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  baseUrl: http://127.0.0.1:8080
-  fileNames:
-  - index.html
-  - sample.pdf
-  - sample.png
+  baseUrl: http://localhost:3000
+  requestConfigs:
+  - endpoint: index.html
+    requestType: 0
+    postData: 
+  - endpoint: sample.png
+    requestType: 0
+    postData: 
+  - endpoint: sample.pdf
+    requestType: 0
+    postData: 
+  - endpoint: api/data
+    requestType: 1
+    postData: 
   requestsPerBatch: 100
   delayBetweenRequests: 0.1
   delayBetweenBatches: 1

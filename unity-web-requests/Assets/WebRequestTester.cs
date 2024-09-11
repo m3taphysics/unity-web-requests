@@ -4,31 +4,43 @@ using UnityEngine.Networking;
 using Cysharp.Threading.Tasks;
 using System.Threading;
 using System.Collections.Generic;
+using System.Text;
 
 public class WebRequestTester : MonoBehaviour
 {
     [SerializeField] private string baseUrl = "http://127.0.0.1";
-    [SerializeField] private string[] fileNames = { "index.html", "sample.pdf", "sample.png" };
+    [SerializeField] private RequestConfig[] requestConfigs;
     [SerializeField] private int requestsPerBatch = 100;
     [SerializeField] private float delayBetweenRequests = 0.1f;
     [SerializeField] private float delayBetweenBatches = 1f;
-    [SerializeField] private float logInterval = 5f; // Log stats every 5 seconds
+    [SerializeField] private float logInterval = 5f;
 
     private CancellationTokenSource cts;
     private int totalRequestsSent = 0;
     private int totalSuccessfulRequests = 0;
     private int totalFailedRequests = 0;
-    private int currentFileIndex = 0;
+    private int currentConfigIndex = 0;
 
     public bool ShouldSendRequests { get; set; } = true;
+
+    [System.Serializable]
+    public class RequestConfig
+    {
+        public string endpoint;
+        public RequestType requestType;
+        public string postData;
+    }
+
+    public enum RequestType
+    {
+        GET,
+        POST
+    }
 
     public async UniTask StartContinuousTest()
     {
         cts = new CancellationTokenSource();
-        totalRequestsSent = 0;
-        totalSuccessfulRequests = 0;
-        totalFailedRequests = 0;
-        currentFileIndex = 0;
+        ResetStats();
 
         try
         {
@@ -52,7 +64,7 @@ public class WebRequestTester : MonoBehaviour
         finally
         {
             cts.Dispose();
-            LogStats(); // Log final stats
+            LogStats();
         }
     }
 
@@ -81,12 +93,12 @@ public class WebRequestTester : MonoBehaviour
 
     private async UniTask SendSingleRequest(CancellationToken cancellationToken)
     {
-        string currentFile = fileNames[currentFileIndex];
-        string fullUrl = $"{baseUrl}/{currentFile}";
+        RequestConfig currentConfig = requestConfigs[currentConfigIndex];
+        string fullUrl = $"{baseUrl}/{currentConfig.endpoint}";
 
         try
         {
-            using (var request = UnityWebRequest.Get(fullUrl))
+            using (UnityWebRequest request = CreateRequest(fullUrl, currentConfig))
             {
                 totalRequestsSent++;
                 await request.SendWebRequest().WithCancellation(cancellationToken);
@@ -95,12 +107,12 @@ public class WebRequestTester : MonoBehaviour
                     request.result == UnityWebRequest.Result.ProtocolError)
                 {
                     totalFailedRequests++;
-                    Debug.LogError($"Request failed for {currentFile}: {request.error}");
+                    Debug.LogError($"Request failed for {currentConfig.endpoint}: {request.error}");
                 }
                 else
                 {
                     totalSuccessfulRequests++;
-                    Debug.Log($"Request successful for {currentFile}");
+                    Debug.Log($"Request successful for {currentConfig.endpoint}");
                 }
             }
         }
@@ -111,11 +123,28 @@ public class WebRequestTester : MonoBehaviour
         catch (System.Exception e)
         {
             totalFailedRequests++;
-            Debug.LogError($"Error in request for {currentFile}: {e.Message}");
+            Debug.LogError($"Error in request for {currentConfig.endpoint}: {e.Message}");
         }
 
-        // Move to the next file
-        currentFileIndex = (currentFileIndex + 1) % fileNames.Length;
+        currentConfigIndex = (currentConfigIndex + 1) % requestConfigs.Length;
+    }
+
+    private UnityWebRequest CreateRequest(string url, RequestConfig config)
+    {
+        switch (config.requestType)
+        {
+            case RequestType.GET:
+                return UnityWebRequest.Get(url);
+            case RequestType.POST:
+                byte[] bodyRaw = Encoding.UTF8.GetBytes(config.postData);
+                UnityWebRequest request = new UnityWebRequest(url, "POST");
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                return request;
+            default:
+                throw new ArgumentException("Unsupported request type");
+        }
     }
 
     private async UniTask LogStatsPeriodicAsync(CancellationToken cancellationToken)
@@ -132,6 +161,14 @@ public class WebRequestTester : MonoBehaviour
         Debug.Log($"Total Requests Sent: {totalRequestsSent}, " +
                   $"Successful: {totalSuccessfulRequests}, " +
                   $"Failed: {totalFailedRequests}");
+    }
+
+    private void ResetStats()
+    {
+        totalRequestsSent = 0;
+        totalSuccessfulRequests = 0;
+        totalFailedRequests = 0;
+        currentConfigIndex = 0;
     }
 
     private void OnDisable()

@@ -1,8 +1,4 @@
 ### How to test
-If you have node installed you can navigate to simple-server and just type:
+Open Sample Scene. Navigate to simple-server and assuming you have node installed:
 
-```npm install -g http server```
-
-then while in the simple-server directory type.
-
-```http-server```
+```node server.js```
